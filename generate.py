@@ -77,7 +77,11 @@ def topline(df, q):
     total_scope_est = 8550
     remaining = max(total_scope_est - len(done_pairs), 0)
     eta_days = remaining / rate24 if rate24 > 0 else float("inf")
-    states = df["State"].value_counts().to_dict()
+    # Hide FAILED from the public dashboard — most of them were the alphagpu06
+    # broken-node storm and would be misleading without the context. They live
+    # in sacct if anyone asks.
+    states = {k: v for k, v in df["State"].value_counts().to_dict().items()
+              if not k.startswith("FAILED")}
     return {
         "total_done":  len(done_pairs),
         "today_done":  len(today_done),
