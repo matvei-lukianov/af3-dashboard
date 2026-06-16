@@ -77,11 +77,11 @@ def topline(df, q):
     total_scope_est = 8550
     remaining = max(total_scope_est - len(done_pairs), 0)
     eta_days = remaining / rate24 if rate24 > 0 else float("inf")
-    # Hide FAILED from the public dashboard — most of them were the alphagpu06
-    # broken-node storm and would be misleading without the context. They live
-    # in sacct if anyone asks.
+    # Hide FAILED and CANCELLED — the former is mostly the alphagpu06 storm,
+    # the latter is our own scancel housekeeping; both would be misleading
+    # without context. They live in sacct if anyone asks.
     states = {k: v for k, v in df["State"].value_counts().to_dict().items()
-              if not k.startswith("FAILED")}
+              if not k.startswith("FAILED") and not k.startswith("CANCELLED")}
     return {
         "total_done":  len(done_pairs),
         "today_done":  len(today_done),
@@ -105,9 +105,9 @@ def plot_daily_progress(df):
     if completed.empty:
         return
     ends = completed["End_dt"].sort_values().reset_index(drop=True)
-    t0 = ends.iloc[0].floor("H")
-    t1 = pd.Timestamp.now().ceil("H")
-    samples = pd.date_range(t0, t1, freq="H")
+    t0 = ends.iloc[0].floor("h")
+    t1 = pd.Timestamp.now().ceil("h")
+    samples = pd.date_range(t0, t1, freq="h")
     values = [((ends > (t - pd.Timedelta(hours=24))) & (ends <= t)).sum()
               for t in samples]
     series = pd.Series(values, index=samples)
@@ -278,11 +278,11 @@ def render_index(stats, q):
 
     return f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>AF3 Campaign Dashboard</title>
-<meta http-equiv="refresh" content="600">
+<meta http-equiv="refresh" content="1800">
 <style>{CSS}</style>
 </head><body>
 <h1>AF3 Campaign Dashboard</h1>
-<p class="stamp">Last updated: <strong>{s['now']}</strong> · auto-refreshes every 10 min · regenerated hourly</p>
+<p class="stamp">Last updated: <strong>{s['now']}</strong> · regenerated on the cluster hourly · this page auto-reloads every 30 min</p>
 
 <div class="cards">
   <div class="card"><div class="v">{s['total_done']:,}</div><div class="l">Total COMPLETED pairs</div></div>
@@ -318,9 +318,8 @@ def render_index(stats, q):
 <h2>Distributions</h2>
 <div class="plots">
   <img src="pending_hist.png" alt="Pending histogram">
-  <img src="running_hist.png" alt="Running histogram">
+  <img src="runtime_hist.png" alt="Runtime histogram">
 </div>
-<div class="plots wide"><img src="runtime_hist.png" alt="Runtime histogram"></div>
 
 <h2>All-time job state breakdown</h2>
 <table><thead><tr><th>State</th><th>Count</th></tr></thead><tbody>{states_html}</tbody></table>
@@ -341,7 +340,6 @@ def main():
     plot_concurrency(df)
     plot_pending(df)
     plot_runtime(df)
-    plot_running_hist(df)
     (OUT/"index.html").write_text(render_index(stats, q))
     (OUT/"stats.json").write_text(json.dumps({
         "now":         stats["now"],
