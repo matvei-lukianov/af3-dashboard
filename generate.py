@@ -98,20 +98,41 @@ def topline(df, q):
 # ----- plots --------------------------------------------------------------
 
 def plot_daily_progress(df):
-    completed = df[df["State"]=="COMPLETED"].copy()
-    completed["day"] = completed["End_dt"].dt.normalize()
-    counts = completed.groupby("day").size()
-    if counts.empty:
+    """Rolling 24h completion rate, sampled hourly. Reacts to changes within
+    the same day so recent improvements are visible immediately — unlike a
+    raw daily bar chart that drops today's partial day to half-height."""
+    completed = df[df["State"]=="COMPLETED"].dropna(subset=["End_dt"]).copy()
+    if completed.empty:
         return
+    ends = completed["End_dt"].sort_values().reset_index(drop=True)
+    t0 = ends.iloc[0].floor("H")
+    t1 = pd.Timestamp.now().ceil("H")
+    samples = pd.date_range(t0, t1, freq="H")
+    values = [((ends > (t - pd.Timedelta(hours=24))) & (ends <= t)).sum()
+              for t in samples]
+    series = pd.Series(values, index=samples)
+
     fig, ax = plt.subplots(figsize=(11, 4))
-    ax.bar(counts.index, counts.values, color="#4a90e2", edgecolor="black", width=0.8)
-    ax.axhline(counts.mean(), color="red", linestyle="--", linewidth=1.2,
-               label=f"mean {counts.mean():.0f}/day")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("COMPLETED pairs")
-    ax.set_title(f"Daily progress (total {int(counts.sum())} since {CAMPAIGN_START})")
+    ax.fill_between(series.index, 0, series.values, alpha=0.25, color="#4a90e2")
+    ax.plot(series.index, series.values, color="#4a90e2", linewidth=1.6,
+            label="rolling 24h")
+    # Today's number sits at the rightmost sample
+    last = int(series.iloc[-1])
+    peak = int(series.max())
+    peak_at = series.idxmax()
+    ax.axhline(series.mean(), color="red", linestyle="--", linewidth=1.0,
+               label=f"campaign avg {series.mean():.0f}/day")
+    ax.scatter([peak_at], [peak], color="green", zorder=5,
+               label=f"peak {peak} on {peak_at.strftime('%b %d %H:%M')}")
+    ax.scatter([series.index[-1]], [last], color="#2c5aa0", zorder=5,
+               label=f"now: {last}/day")
+    ax.set_xlabel("Wall time")
+    ax.set_ylabel("COMPLETED pairs in trailing 24h")
+    ax.set_title(f"Rolling 24h completion rate "
+                 f"(current {last}, all-time peak {peak})")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
-    ax.legend(); ax.grid(True, alpha=0.3)
+    ax.legend(loc="upper left", fontsize=9)
+    ax.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(OUT/"daily_progress.png", dpi=110)
     plt.close()
