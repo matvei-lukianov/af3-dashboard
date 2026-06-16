@@ -1,0 +1,72 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>AF3 Campaign Dashboard</title>
+<meta http-equiv="refresh" content="600">
+<style>
+body { font-family: -apple-system, sans-serif; max-width: 1200px; margin: 20px auto;
+       padding: 0 20px; color: #222; }
+h1 { border-bottom: 2px solid #4a90e2; padding-bottom: 6px; }
+.stamp { color: #888; font-size: 0.9em; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr));
+         gap: 12px; margin: 16px 0; }
+.card { background: #f5f8fc; border: 1px solid #d1dbe8; border-radius: 8px;
+        padding: 14px; }
+.card .v { font-size: 2em; font-weight: bold; color: #2c5aa0; }
+.card .l { font-size: 0.85em; color: #666; text-transform: uppercase; }
+.plots { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.plots img { width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; }
+.plots.wide img { grid-column: span 2; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9em; margin: 10px 0; }
+th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; }
+th { background: #f5f8fc; }
+tr:nth-child(even) { background: #fafafa; }
+.queue-table { max-height: 400px; overflow-y: auto; border: 1px solid #ddd;
+               border-radius: 4px; }
+</style>
+</head><body>
+<h1>AF3 Campaign Dashboard</h1>
+<p class="stamp">Last updated: <strong>2026-06-16 13:48 EDT</strong> · auto-refreshes every 10 min · regenerated hourly</p>
+
+<div class="cards">
+  <div class="card"><div class="v">5,367</div><div class="l">Total COMPLETED pairs</div></div>
+  <div class="card"><div class="v">326</div><div class="l">Done today</div></div>
+  <div class="card"><div class="v">423</div><div class="l">Last 24 h rate</div></div>
+  <div class="card"><div class="v">3,183</div><div class="l">Remaining (current batch)</div></div>
+  <div class="card"><div class="v">7.5 days</div><div class="l">ETA at current rate</div></div>
+  <div class="card"><div class="v">0 / 50</div><div class="l">Running / Pending now</div></div>
+</div>
+
+<h2>Live queue</h2>
+<div class="plots">
+  <div>
+    <h3>RUNNING (0)</h3>
+    <div class="queue-table">
+      <table><thead><tr><th>Job</th><th>Elapsed</th><th>Left</th><th>Reason / Node</th></tr></thead>
+      <tbody><tr><td colspan=4><em>none</em></td></tr></tbody></table>
+    </div>
+  </div>
+  <div>
+    <h3>PENDING (50)</h3>
+    <div class="queue-table">
+      <table><thead><tr><th>Job</th><th>Wait</th><th>Limit</th><th>Reason</th></tr></thead>
+      <tbody><tr><td>p039-p313_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p317_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p316_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p314_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p319_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p318_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p320_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p324_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p323_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p325_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p326_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p327_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p329_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p330_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p331_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p333_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p334_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p335_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p336_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p338_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p337_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p339_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p340_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p341_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p344_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p345_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p346_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p347_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p350_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p348_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p351_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p353_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p355_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p354_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p356_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p357_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p358_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p359_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p361_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p363_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p364_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p365_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p366_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p367_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p368_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p369_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p370_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p371_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p372_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr><tr><td>p039-p374_af3</td><td>0:00</td><td>30:00</td><td>(Priority)</td></tr></tbody></table>
+    </div>
+  </div>
+</div>
+
+<h2>Progress</h2>
+<div class="plots wide"><img src="daily_progress.png" alt="Daily progress"></div>
+<div class="plots wide"><img src="concurrency.png" alt="Concurrency timeline"></div>
+
+<h2>Distributions</h2>
+<div class="plots">
+  <img src="pending_hist.png" alt="Pending histogram">
+  <img src="running_hist.png" alt="Running histogram">
+</div>
+<div class="plots wide"><img src="runtime_hist.png" alt="Runtime histogram"></div>
+
+<h2>All-time job state breakdown</h2>
+<table><thead><tr><th>State</th><th>Count</th></tr></thead><tbody><tr><td>FAILED</td><td>5621</td></tr><tr><td>COMPLETED</td><td>5367</td></tr><tr><td>CANCELLED</td><td>282</td></tr><tr><td>TIMEOUT</td><td>113</td></tr><tr><td>PENDING</td><td>50</td></tr></tbody></table>
+
+<p class="stamp"><small>Generated by <code>generate.py</code> on the SUNY HPC cluster.
+Source / regeneration policy at <a href="https://github.com/matvei-lukianov/af3-dashboard">github.com/matvei-lukianov/af3-dashboard</a></small></p>
+</body></html>
