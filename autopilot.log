@@ -3845,3 +3845,25 @@ To github-af3:matvei-lukianov/af3-dashboard.git
 /mnt/home/mlikianov/dashboard/generate.py:39: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
   df[c+"_dt"] = pd.to_datetime(df[c], errors="coerce")
 Generated dashboard at /mnt/home/mlikianov/dashboard — 7955 total, 1R/49PD
+To github-af3:matvei-lukianov/af3-dashboard.git
+   42c7488..b75e1ae  main -> main
+[2026-07-10 13:49:04] pushed
+[2026-07-10 14:49:12] regenerating...
+Slurm accounting storage is disabled
+Traceback (most recent call last):
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 358, in <module>
+    main()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 333, in main
+    df = load_sacct()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 26, in load_sacct
+    out = sh(["sacct", "-u", "mlikianov", "-X",
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 23, in sh
+    return subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True).stdout
+  File "/usr/lib64/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['sacct', '-u', 'mlikianov', '-X', '--starttime=2026-05-22', '--format=JobID,JobName,Submit,Start,End,Elapsed,State,NodeList', '-P', '-n']' returned non-zero exit status 1.
+[2026-07-10 14:49:12] generate.py FAILED
+[2026-07-10 15:49:15] regenerating...
+/mnt/home/mlikianov/dashboard/generate.py:39: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df[c+"_dt"] = pd.to_datetime(df[c], errors="coerce")
+Generated dashboard at /mnt/home/mlikianov/dashboard — 7968 total, 1R/49PD
