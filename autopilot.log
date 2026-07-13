@@ -4371,3 +4371,10 @@ To github-af3:matvei-lukianov/af3-dashboard.git
 /mnt/home/mlikianov/dashboard/generate.py:39: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
   df[c+"_dt"] = pd.to_datetime(df[c], errors="coerce")
 Generated dashboard at /mnt/home/mlikianov/dashboard — 8511 total, 2R/48PD
+To github-af3:matvei-lukianov/af3-dashboard.git
+   de25b45..3466cd7  main -> main
+[2026-07-13 15:59:34] pushed
+[2026-07-13 16:59:43] regenerating...
+/mnt/home/mlikianov/dashboard/generate.py:39: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df[c+"_dt"] = pd.to_datetime(df[c], errors="coerce")
+Generated dashboard at /mnt/home/mlikianov/dashboard — 8518 total, 1R/49PD
