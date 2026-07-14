@@ -288,8 +288,6 @@ def render_index(stats, q):
   <div class="card"><div class="v">{s['total_done']:,}</div><div class="l">Total COMPLETED pairs</div></div>
   <div class="card"><div class="v">{s['today_done']:,}</div><div class="l">Done today</div></div>
   <div class="card"><div class="v">{s['last24_rate']:,}</div><div class="l">Last 24 h rate</div></div>
-  <div class="card"><div class="v">{s['remaining']:,}</div><div class="l">Remaining (current batch)</div></div>
-  <div class="card"><div class="v">{eta}</div><div class="l">ETA at current rate</div></div>
   <div class="card"><div class="v">{s['running']} / {s['pending']}</div><div class="l">Running / Pending now</div></div>
 </div>
 
