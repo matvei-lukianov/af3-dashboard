@@ -6688,3 +6688,70 @@ To github-af3:matvei-lukianov/af3-dashboard.git
 /mnt/home/mlikianov/dashboard/generate.py:39: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
   df[c+"_dt"] = pd.to_datetime(df[c], errors="coerce")
 Generated dashboard at /mnt/home/mlikianov/dashboard — 11367 total, 0R/0PD
+To github-af3:matvei-lukianov/af3-dashboard.git
+   afd90c8..85a0208  main -> main
+[2026-07-27 11:48:58] pushed
+[2026-07-27 12:49:07] regenerating...
+Slurm accounting storage is disabled
+Traceback (most recent call last):
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 356, in <module>
+    main()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 331, in main
+    df = load_sacct()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 26, in load_sacct
+    out = sh(["sacct", "-u", "mlikianov", "-X",
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 23, in sh
+    return subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True).stdout
+  File "/usr/lib64/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['sacct', '-u', 'mlikianov', '-X', '--starttime=2026-05-22', '--format=JobID,JobName,Submit,Start,End,Elapsed,State,NodeList', '-P', '-n']' returned non-zero exit status 1.
+[2026-07-27 12:49:07] generate.py FAILED
+[2026-07-27 13:49:11] regenerating...
+Slurm accounting storage is disabled
+Traceback (most recent call last):
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 356, in <module>
+    main()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 331, in main
+    df = load_sacct()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 26, in load_sacct
+    out = sh(["sacct", "-u", "mlikianov", "-X",
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 23, in sh
+    return subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True).stdout
+  File "/usr/lib64/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['sacct', '-u', 'mlikianov', '-X', '--starttime=2026-05-22', '--format=JobID,JobName,Submit,Start,End,Elapsed,State,NodeList', '-P', '-n']' returned non-zero exit status 1.
+[2026-07-27 13:49:11] generate.py FAILED
+[2026-07-27 14:49:15] regenerating...
+Slurm accounting storage is disabled
+Traceback (most recent call last):
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 356, in <module>
+    main()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 331, in main
+    df = load_sacct()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 26, in load_sacct
+    out = sh(["sacct", "-u", "mlikianov", "-X",
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 23, in sh
+    return subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True).stdout
+  File "/usr/lib64/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['sacct', '-u', 'mlikianov', '-X', '--starttime=2026-05-22', '--format=JobID,JobName,Submit,Start,End,Elapsed,State,NodeList', '-P', '-n']' returned non-zero exit status 1.
+[2026-07-27 14:49:15] generate.py FAILED
+[2026-07-27 15:49:19] regenerating...
+Slurm accounting storage is disabled
+Traceback (most recent call last):
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 356, in <module>
+    main()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 331, in main
+    df = load_sacct()
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 26, in load_sacct
+    out = sh(["sacct", "-u", "mlikianov", "-X",
+  File "/mnt/home/mlikianov/dashboard/generate.py", line 23, in sh
+    return subprocess.run(cmd, stdout=subprocess.PIPE, text=True, check=True).stdout
+  File "/usr/lib64/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['sacct', '-u', 'mlikianov', '-X', '--starttime=2026-05-22', '--format=JobID,JobName,Submit,Start,End,Elapsed,State,NodeList', '-P', '-n']' returned non-zero exit status 1.
+[2026-07-27 15:49:19] generate.py FAILED
+[2026-07-27 16:49:23] regenerating...
+/mnt/home/mlikianov/dashboard/generate.py:39: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
+  df[c+"_dt"] = pd.to_datetime(df[c], errors="coerce")
+Generated dashboard at /mnt/home/mlikianov/dashboard — 11371 total, 1R/49PD
