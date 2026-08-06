@@ -1,10 +1,10 @@
 {
-  "now": "2026-08-06 17:26 EDT",
-  "total_done": 12274,
-  "today_done": 35,
-  "last24_rate": 35,
+  "now": "2026-08-06 18:26 EDT",
+  "total_done": 12279,
+  "today_done": 40,
+  "last24_rate": 40,
   "remaining": 0,
   "eta_days": 0.0,
-  "running": 14,
-  "pending": 1
+  "running": 9,
+  "pending": 0
 }
