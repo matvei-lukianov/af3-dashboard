@@ -15,7 +15,25 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 OUT = Path(__file__).parent
-CAMPAIGN_START = "2026-05-22"          # first batch (p021) began
+CAMPAIGN_START = "2026-09-21"          # oligomer campaign kickoff (p041 first)
+
+# ----- new-campaign scope (receptor × oligomer) ---------------------------
+# We now count ONLY the current oligomer campaign: 325 receptors × 110
+# oligomer-ligands = 35 750 pairs. The prior monomer campaign is done and
+# archived on gdrive; its history is out of scope for the live dashboard.
+RECEPTORS_FILE = "/mnt/home/mlikianov/new_task/receptors_for_oligomers.txt"
+LIGANDS_FILE   = "/mnt/home/mlikianov/new_task/oligomers_list.txt"
+_RECEPTORS = set(open(RECEPTORS_FILE).read().split())
+_LIGANDS   = set(open(LIGANDS_FILE).read().split())
+TOTAL_SCOPE = len(_RECEPTORS) * len(_LIGANDS)   # 35 750
+
+def _in_scope(pair):
+    """pair looks like 'pXXX-pYYY'; scope = receptor in oligomer-receptor list AND ligand in oligomer list."""
+    try:
+        r, l = pair.split("-")
+    except ValueError:
+        return False
+    return r in _RECEPTORS and l in _LIGANDS
 
 # ----- pull sacct + squeue ------------------------------------------------
 
@@ -32,9 +50,13 @@ def load_sacct():
         return pd.DataFrame()
     df = pd.DataFrame(rows, columns=["JobID","JobName","Submit","Start","End",
                                      "Elapsed","State","NodeList"])
-    df = df[df["JobName"].str.match(r"^p0\d+-p\d+_af3$", na=False)].copy()
+    # Keep both per-pair rows (old style) AND per-batch rows (new style).
+    # Batch job names are like 'af3_p041_b003'; per-pair names are 'p041-p498_af3'.
+    df = df[df["JobName"].str.match(r"^(p\d+-p\d+_af3|af3_p\d+_b\d+)$", na=False)].copy()
     df["State"] = df["State"].str.replace(r" by \d+", "", regex=True)
     df["pair"]  = df["JobName"].str.replace(r"_af3$", "", regex=True)
+    if df.empty:
+        return df
     for c in ("Submit", "Start", "End"):
         df[c+"_dt"] = pd.to_datetime(df[c], errors="coerce")
     def to_sec(s):
@@ -61,32 +83,50 @@ def load_squeue():
 
 # ----- core stats ---------------------------------------------------------
 
+def _scan_done_pairs():
+    """Filesystem scan: for every in-scope pair (325 × 110), return list of
+    (pair, mtime) where a top-level {pair}_af3_model.cif exists. This is
+    the ground-truth 'done' set — sacct alone can't tell us because the
+    batch mode packs many pairs into one SLURM job."""
+    INPUTS = Path("/mnt/home/mlikianov/home/k818y558/MG_input_files/inputs")
+    out = []
+    for r in _RECEPTORS:
+        recv_dir = INPUTS / f"{r}-vs-all"
+        if not recv_dir.is_dir():
+            continue
+        for l in _LIGANDS:
+            pair = f"{r}-{l}"
+            m = recv_dir / f"{pair}_af3_output" / f"{pair}_af3" / f"{pair}_af3_model.cif"
+            if m.is_file():
+                out.append((pair, m.stat().st_mtime))
+    return out
+
+
 def topline(df, q):
-    done_pairs = set(df.loc[df["State"]=="COMPLETED", "pair"])
+    """`df` is kept only for state histograms (SLURM view of batch jobs).
+    Per-pair completions come from filesystem to be batch-mode aware."""
     now = pd.Timestamp.now()
     today = now.normalize()
-    today_done = df[(df["State"]=="COMPLETED") & (df["End_dt"] >= today)]
-    yest_done = df[(df["State"]=="COMPLETED") &
-                   (df["End_dt"] >= today - timedelta(days=1)) &
-                   (df["End_dt"] < today)]
-    last24 = df[(df["State"]=="COMPLETED") &
-                (df["End_dt"] >= now - timedelta(hours=24))]
-    rate24 = len(last24)
-    # Total scope: 19 receptors × ~480 ligands minus Kamila excludes — best
-    # estimate from launcher logs. Hardcode for now.
-    total_scope_est = 8550
+
+    done = _scan_done_pairs()
+    done_pairs = {p for p, _ in done}
+    done_ts = pd.Series([pd.Timestamp(t, unit="s") for _, t in done])
+    today_done = int((done_ts >= today).sum()) if len(done_ts) else 0
+    yest_done  = int(((done_ts >= today - timedelta(days=1)) & (done_ts < today)).sum()) if len(done_ts) else 0
+    last24     = int((done_ts >= now - timedelta(hours=24)).sum()) if len(done_ts) else 0
+
+    total_scope_est = TOTAL_SCOPE
     remaining = max(total_scope_est - len(done_pairs), 0)
-    eta_days = remaining / rate24 if rate24 > 0 else float("inf")
-    # Hide FAILED and CANCELLED — the former is mostly the alphagpu06 storm,
-    # the latter is our own scancel housekeeping; both would be misleading
-    # without context. They live in sacct if anyone asks.
+    eta_days  = remaining / last24 if last24 > 0 else float("inf")
+
+    # SLURM batch job states (from sacct)
     states = {k: v for k, v in df["State"].value_counts().to_dict().items()
-              if not k.startswith("FAILED") and not k.startswith("CANCELLED")}
+              if not k.startswith("FAILED") and not k.startswith("CANCELLED")} if not df.empty else {}
     return {
         "total_done":  len(done_pairs),
-        "today_done":  len(today_done),
-        "yesterday":   len(yest_done),
-        "last24_rate": rate24,
+        "today_done":  today_done,
+        "yesterday":   yest_done,
+        "last24_rate": last24,
         "remaining":   remaining,
         "eta_days":    eta_days,
         "running":     int((q["State"]=="RUNNING").sum()) if not q.empty else 0,
