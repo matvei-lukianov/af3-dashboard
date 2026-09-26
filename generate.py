@@ -4,7 +4,7 @@
 Runs hourly via cron. Output goes into this directory, then a git commit/push
 publishes it to https://matvei-lukianov.github.io/af3-dashboard/.
 """
-import subprocess, re, json, html
+import subprocess, re, json, html, os
 from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
@@ -96,21 +96,47 @@ def _scan_done_pairs():
             continue
         for l in _LIGANDS:
             pair = f"{r}-{l}"
-            m = recv_dir / f"{pair}_af3_output" / f"{pair}_af3" / f"{pair}_af3_model.cif"
-            if m.is_file():
-                out.append((pair, m.stat().st_mtime))
+            pdir = recv_dir / f"{pair}_af3_output"
+            if not pdir.is_dir():
+                continue
+            # Re-runs land in dated dirs ({pair}_af3_YYYYMMDD_HHMMSS), so check every subdir.
+            mt = [m.stat().st_mtime for s in os.scandir(pdir) if s.is_dir()
+                  for m in [Path(s.path) / f"{pair}_af3_model.cif"] if m.is_file()]
+            if mt:
+                out.append((pair, min(mt)))
     return out
 
 
-def topline(df, q):
+# ----- Beta cluster (separate SLURM; snapshot written by beta_snapshot.sh) --
+
+BETA_SNAPSHOT = OUT / "beta_snapshot.json"
+BETA_CLAIMS   = Path("/mnt/home/mlikianov/af3_logs/beta_claims.txt")
+
+def beta_receptors():
+    return set(BETA_CLAIMS.read_text().split()) if BETA_CLAIMS.exists() else set()
+
+def load_beta():
+    """Returns (queue_df, age_minutes). Beta clocks are UTC; convert to local."""
+    cols = ["JobID","Name","State","Elapsed","TimeLeft","Reason","Submit",
+            "pairs_total","pairs_done","pairs_failed"]
+    if not BETA_SNAPSHOT.exists():
+        return pd.DataFrame(columns=cols), None
+    d = json.loads(BETA_SNAPSHOT.read_text())
+    age = (datetime.now().timestamp() - d["ts"]) / 60
+    return pd.DataFrame(d["queue"], columns=cols), age
+
+
+def topline(df, q, qb, done):
     """`df` is kept only for state histograms (SLURM view of batch jobs).
     Per-pair completions come from filesystem to be batch-mode aware."""
     now = pd.Timestamp.now()
     today = now.normalize()
 
-    done = _scan_done_pairs()
     done_pairs = {p for p, _ in done}
-    done_ts = pd.Series([pd.Timestamp(t, unit="s") for _, t in done])
+    beta_r = beta_receptors()
+    beta_ts = pd.Series([pd.Timestamp(datetime.fromtimestamp(t)) for p, t in done
+                         if p.split("-")[0] in beta_r])
+    done_ts = pd.Series([pd.Timestamp(datetime.fromtimestamp(t)) for _, t in done])
     today_done = int((done_ts >= today).sum()) if len(done_ts) else 0
     yest_done  = int(((done_ts >= today - timedelta(days=1)) & (done_ts < today)).sum()) if len(done_ts) else 0
     last24     = int((done_ts >= now - timedelta(hours=24)).sum()) if len(done_ts) else 0
@@ -131,31 +157,39 @@ def topline(df, q):
         "eta_days":    eta_days,
         "running":     int((q["State"]=="RUNNING").sum()) if not q.empty else 0,
         "pending":     int((q["State"]=="PENDING").sum()) if not q.empty else 0,
+        "beta_running": int((qb["State"]=="RUNNING").sum()) if not qb.empty else 0,
+        "beta_pending": int((qb["State"]=="PENDING").sum()) if not qb.empty else 0,
+        "beta_done":    len(beta_ts),
+        "beta_last24":  int((beta_ts >= now - timedelta(hours=24)).sum()) if len(beta_ts) else 0,
         "states_alltime": states,
         "now":         now.strftime("%Y-%m-%d %H:%M EDT"),
     }
 
 # ----- plots --------------------------------------------------------------
 
-def plot_daily_progress(df):
-    """Rolling 24h completion rate, sampled hourly. Reacts to changes within
-    the same day so recent improvements are visible immediately — unlike a
-    raw daily bar chart that drops today's partial day to half-height."""
-    completed = df[df["State"]=="COMPLETED"].dropna(subset=["End_dt"]).copy()
-    if completed.empty:
+def plot_daily_progress(done):
+    """Rolling 24h rate of finished PAIRS (filesystem timestamps), sampled hourly,
+    stacked Alpha + Beta. Beta = receptors listed in beta_claims.txt."""
+    if not done:
         return
-    ends = completed["End_dt"].sort_values().reset_index(drop=True)
-    t0 = ends.iloc[0].floor("h")
+    beta_r = beta_receptors()
+    ts = pd.DataFrame([(pd.Timestamp(datetime.fromtimestamp(t)), p.split("-")[0] in beta_r)
+                       for p, t in done], columns=["t", "beta"]).sort_values("t")
+    t0 = max(ts["t"].iloc[0].floor("h"), pd.Timestamp(CAMPAIGN_START))
     t1 = pd.Timestamp.now().ceil("h")
     samples = pd.date_range(t0, t1, freq="h")
-    values = [((ends > (t - pd.Timedelta(hours=24))) & (ends <= t)).sum()
-              for t in samples]
-    series = pd.Series(values, index=samples)
+    def roll(sub):
+        v = sub["t"].values
+        return np.array([((v > np.datetime64(t - pd.Timedelta(hours=24))) & (v <= np.datetime64(t))).sum()
+                         for t in samples])
+    a, b = roll(ts[~ts["beta"]]), roll(ts[ts["beta"]])
+    series = pd.Series(a + b, index=samples)
 
     fig, ax = plt.subplots(figsize=(11, 4))
-    ax.fill_between(series.index, 0, series.values, alpha=0.25, color="#4a90e2")
-    ax.plot(series.index, series.values, color="#4a90e2", linewidth=1.6,
-            label="rolling 24h")
+    ax.stackplot(series.index, a, b, colors=["#4a90e2", "#e2844a"], alpha=0.35,
+                 labels=["Alpha", "Beta"])
+    ax.plot(series.index, series.values, color="#2c5aa0", linewidth=1.4,
+            label="total (rolling 24h)")
     # Today's number sits at the rightmost sample
     last = int(series.iloc[-1])
     peak = int(series.max())
@@ -167,7 +201,7 @@ def plot_daily_progress(df):
     ax.scatter([series.index[-1]], [last], color="#2c5aa0", zorder=5,
                label=f"now: {last}/day")
     ax.set_xlabel("Wall time")
-    ax.set_ylabel("COMPLETED pairs in trailing 24h")
+    ax.set_ylabel("Pairs finished in trailing 24h")
     ax.set_title(f"Rolling 24h completion rate "
                  f"(current {last}, all-time peak {peak})")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
@@ -195,11 +229,11 @@ def plot_concurrency(df):
     fig, ax = plt.subplots(figsize=(11, 4))
     ax.step(t, c, where="post", color="#7b68ee", linewidth=1.1)
     ax.fill_between(t, 0, c, step="post", alpha=0.2, color="#7b68ee")
-    ax.axhline(30, color="red", linestyle=":", alpha=0.7, label="MaxJobsPU=30")
+    ax.axhline(60, color="red", linestyle=":", alpha=0.7, label="cap 60 (30 standard + 30 priority)")
     ax.axhline(peak, color="green", linestyle=":", alpha=0.5, label=f"peak={peak}")
     ax.set_xlabel("Wall time")
-    ax.set_ylabel("# concurrent AF3 jobs")
-    ax.set_title(f"Concurrency timeline (peak {peak})")
+    ax.set_ylabel("# concurrent AF3 jobs (1 GPU each)")
+    ax.set_title(f"Alpha concurrency timeline (peak {peak})")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
     ax.legend(loc="upper left"); ax.grid(True, alpha=0.3)
     plt.tight_layout()
@@ -292,8 +326,26 @@ tr:nth-child(even) { background: #fafafa; }
                border-radius: 4px; }
 """
 
-def render_index(stats, q):
+def render_index(stats, q, qb, beta_age):
     s = stats
+    def beta_rows():
+        rows = []
+        for _, r in qb.iterrows():
+            tot = r.get("pairs_total")
+            prog = f"{r['pairs_done']} / {int(tot)}" if pd.notna(tot) else str(r["pairs_done"])
+            if r.get("pairs_failed"):
+                prog += f" ({r['pairs_failed']} failed)"
+            where = r["Reason"] if r["State"] == "RUNNING" else f"pending: {r['Reason']}"
+            rows.append(f"<tr><td>{html.escape(r['Name'])}</td><td>{html.escape(r['State'])}</td>"
+                        f"<td>{html.escape(r['Elapsed'])}</td><td>{html.escape(r['TimeLeft'])}</td>"
+                        f"<td>{html.escape(prog)}</td><td>{html.escape(where)}</td></tr>")
+        return "".join(rows) or "<tr><td colspan=6><em>none</em></td></tr>"
+    if beta_age is None:
+        beta_note = "<p class='stamp'>No Beta snapshot found.</p>"
+    elif beta_age > 45:
+        beta_note = f"<p class='stamp' style='color:#c00'>Beta snapshot is {beta_age:.0f} min old — beta_snapshot.sh may have stopped.</p>"
+    else:
+        beta_note = f"<p class='stamp'>Beta snapshot {beta_age:.0f} min old (refreshed every 10 min from the Beta login node).</p>"
     eta = "∞" if s["eta_days"] == float("inf") else f"{s['eta_days']:.1f} days"
     states_html = "".join(
         f"<tr><td>{html.escape(k)}</td><td>{v}</td></tr>"
@@ -328,10 +380,20 @@ def render_index(stats, q):
   <div class="card"><div class="v">{s['total_done']:,}</div><div class="l">Total COMPLETED pairs</div></div>
   <div class="card"><div class="v">{s['today_done']:,}</div><div class="l">Done today</div></div>
   <div class="card"><div class="v">{s['last24_rate']:,}</div><div class="l">Last 24 h rate</div></div>
-  <div class="card"><div class="v">{s['running']} / {s['pending']}</div><div class="l">Running / Pending now</div></div>
+  <div class="card"><div class="v">{s['running']} / {s['pending']}</div><div class="l">Alpha jobs running / pending (1 GPU each)</div></div>
+  <div class="card"><div class="v">{s['beta_running']} / {s['beta_pending']}</div><div class="l">Beta jobs running / pending (4× GB200 each)</div></div>
+  <div class="card"><div class="v">{s['beta_last24']:,}</div><div class="l">Beta pairs, last 24 h</div></div>
+  <div class="card"><div class="v">{eta}</div><div class="l">ETA at last-24h rate ({s['remaining']:,} left)</div></div>
 </div>
 
-<h2>Live queue</h2>
+<h2>Beta (GB200) jobs</h2>
+{beta_note}
+<div class="queue-table">
+<table><thead><tr><th>Job</th><th>State</th><th>Elapsed</th><th>Left</th><th>Pairs done</th><th>Node / reason</th></tr></thead>
+<tbody>{beta_rows()}</tbody></table>
+</div>
+
+<h2>Alpha live queue</h2>
 <div class="plots">
   <div>
     <h3>RUNNING ({s['running']})</h3>
@@ -370,15 +432,17 @@ Source / regeneration policy at <a href="https://github.com/matvei-lukianov/af3-
 def main():
     df = load_sacct()
     q  = load_squeue()
+    qb, beta_age = load_beta()
     if df.empty:
         print("no sacct data — bailing")
         return
-    stats = topline(df, q)
-    plot_daily_progress(df)
+    done = _scan_done_pairs()
+    stats = topline(df, q, qb, done)
+    plot_daily_progress(done)
     plot_concurrency(df)
     plot_pending(df)
     plot_runtime(df)
-    (OUT/"index.html").write_text(render_index(stats, q))
+    (OUT/"index.html").write_text(render_index(stats, q, qb, beta_age))
     (OUT/"stats.json").write_text(json.dumps({
         "now":         stats["now"],
         "total_done":  stats["total_done"],
@@ -388,9 +452,14 @@ def main():
         "eta_days":    stats["eta_days"] if stats["eta_days"] != float("inf") else None,
         "running":     stats["running"],
         "pending":     stats["pending"],
+        "beta_running": stats["beta_running"],
+        "beta_pending": stats["beta_pending"],
+        "beta_done":    stats["beta_done"],
+        "beta_last24":  stats["beta_last24"],
     }, indent=2))
     print(f"Generated dashboard at {OUT} — {stats['total_done']} total, "
-          f"{stats['running']}R/{stats['pending']}PD")
+          f"Alpha {stats['running']}R/{stats['pending']}PD, "
+          f"Beta {stats['beta_running']}R/{stats['beta_pending']}PD ({stats['beta_last24']} pairs/24h)")
 
 if __name__ == "__main__":
     main()
