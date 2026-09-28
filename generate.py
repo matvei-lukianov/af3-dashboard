@@ -126,6 +126,46 @@ def load_beta():
     return pd.DataFrame(d["queue"], columns=cols), age
 
 
+# ----- size-aware ETA ------------------------------------------------------
+# Remaining pairs differ a lot in size (250 .. 3400 residues, ~30x in compute), so
+# "pairs left / pairs per day" swings with whatever mix just finished. Instead weigh
+# every pair by its expected compute (Beta launcher's calibrated time model), measure
+# how much of that work both clusters actually finished over the last 6 h, and divide.
+import sys
+sys.path.insert(0, "/mnt/home/mlikianov/beta_containers")
+from AF3_beta_launcher import est_pair_seconds, pair_size   # noqa: E402
+
+INPUTS_DIR   = Path("/mnt/home/mlikianov/home/k818y558/MG_input_files/inputs")
+SIZE_CACHE   = OUT / "pair_sizes.json"
+EXCLUDED_REC = {"p043"}          # dropped from the campaign, never submitted
+ETA_WINDOW_H = 6
+
+def pair_sizes():
+    cache = json.loads(SIZE_CACHE.read_text()) if SIZE_CACHE.exists() else {}
+    changed = False
+    for r in _RECEPTORS - EXCLUDED_REC:
+        for l in _LIGANDS:
+            pair = f"{r}-{l}"
+            if pair in cache:
+                continue
+            jp = INPUTS_DIR / f"{r}-vs-all" / f"{pair}_af3_output" / f"{pair}_af3_input.json"
+            if jp.is_file():
+                cache[pair] = pair_size(jp); changed = True
+    if changed:
+        SIZE_CACHE.write_text(json.dumps(cache))
+    return cache
+
+def size_aware_eta(done, now_ts):
+    sizes = pair_sizes()
+    done_set = {p for p, _ in done}
+    left = [p for p in sizes if p not in done_set]
+    work_left = sum(est_pair_seconds(sizes[p]) for p in left)
+    cutoff = now_ts - ETA_WINDOW_H * 3600
+    work_rate = sum(est_pair_seconds(sizes[p]) for p, t in done if t >= cutoff and p in sizes) / ETA_WINDOW_H
+    days = work_left / work_rate / 24 if work_rate > 0 else float("inf")
+    return days, len(left)
+
+
 def topline(df, q, qb, done):
     """`df` is kept only for state histograms (SLURM view of batch jobs).
     Per-pair completions come from filesystem to be batch-mode aware."""
@@ -141,9 +181,8 @@ def topline(df, q, qb, done):
     yest_done  = int(((done_ts >= today - timedelta(days=1)) & (done_ts < today)).sum()) if len(done_ts) else 0
     last24     = int((done_ts >= now - timedelta(hours=24)).sum()) if len(done_ts) else 0
 
-    total_scope_est = TOTAL_SCOPE
-    remaining = max(total_scope_est - len(done_pairs), 0)
-    eta_days  = remaining / last24 if last24 > 0 else float("inf")
+    eta_days, remaining = size_aware_eta(done, datetime.now().timestamp())
+    eta_linear = remaining / last24 if last24 > 0 else float("inf")
 
     # SLURM batch job states (from sacct)
     states = {k: v for k, v in df["State"].value_counts().to_dict().items()
@@ -155,6 +194,7 @@ def topline(df, q, qb, done):
         "last24_rate": last24,
         "remaining":   remaining,
         "eta_days":    eta_days,
+        "eta_linear":  eta_linear,
         "running":     int((q["State"]=="RUNNING").sum()) if not q.empty else 0,
         "pending":     int((q["State"]=="PENDING").sum()) if not q.empty else 0,
         "beta_running": int((qb["State"]=="RUNNING").sum()) if not qb.empty else 0,
@@ -210,6 +250,42 @@ def plot_daily_progress(done):
     plt.tight_layout()
     plt.savefig(OUT/"daily_progress.png", dpi=110)
     plt.close()
+
+def plot_hourly_rate(done, hours=72):
+    """Rolling 1h rate of finished pairs (same style as the 24h chart), sampled
+    every 10 min over the last `hours`, stacked Alpha + Beta."""
+    if not done:
+        return
+    beta_r = beta_receptors()
+    now = pd.Timestamp.now()
+    t0 = (now - pd.Timedelta(hours=hours)).floor("10min")
+    samples = pd.date_range(t0, now.floor("10min"), freq="10min")
+    ts = pd.DataFrame([(pd.Timestamp(datetime.fromtimestamp(t)), p.split("-")[0] in beta_r)
+                       for p, t in done], columns=["t", "beta"])
+    def roll(sub):
+        v = np.sort(sub["t"].values)
+        hi = np.searchsorted(v, samples.values, side="right")
+        lo = np.searchsorted(v, (samples - pd.Timedelta(hours=1)).values, side="right")
+        return hi - lo
+    a, b = roll(ts[~ts["beta"]]), roll(ts[ts["beta"]])
+    series = pd.Series(a + b, index=samples)
+
+    fig, ax = plt.subplots(figsize=(11, 4))
+    ax.stackplot(series.index, a, b, colors=["#4a90e2", "#e2844a"], alpha=0.35,
+                 labels=["Alpha", "Beta"])
+    ax.plot(series.index, series.values, color="#2c5aa0", linewidth=1.2,
+            label="total (rolling 1h)")
+    ax.set_xlabel("Wall time")
+    ax.set_ylabel("Pairs finished in trailing 1h")
+    ax.set_title(f"Rolling 1h completion rate (now {int(series.iloc[-1])}/h, "
+                 f"peak {int(series.max())}/h, last {hours} h)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d %H:%M"))
+    ax.legend(loc="upper left", fontsize=9)
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(OUT/"hourly_rate.png", dpi=110)
+    plt.close()
+
 
 def plot_concurrency(df):
     started = df[df["Start_dt"].notna()].copy()
@@ -347,6 +423,7 @@ def render_index(stats, q, qb, beta_age):
     else:
         beta_note = f"<p class='stamp'>Beta snapshot {beta_age:.0f} min old (refreshed every 10 min from the Beta login node).</p>"
     eta = "∞" if s["eta_days"] == float("inf") else f"{s['eta_days']:.1f} days"
+    eta_lin = "∞" if s["eta_linear"] == float("inf") else f"{s['eta_linear']:.1f} days"
     states_html = "".join(
         f"<tr><td>{html.escape(k)}</td><td>{v}</td></tr>"
         for k, v in sorted(s["states_alltime"].items(), key=lambda x: -x[1])
@@ -383,7 +460,8 @@ def render_index(stats, q, qb, beta_age):
   <div class="card"><div class="v">{s['running']} / {s['pending']}</div><div class="l">Alpha jobs running / pending (1 GPU each)</div></div>
   <div class="card"><div class="v">{s['beta_running']} / {s['beta_pending']}</div><div class="l">Beta jobs running / pending (4× GB200 each)</div></div>
   <div class="card"><div class="v">{s['beta_last24']:,}</div><div class="l">Beta pairs, last 24 h</div></div>
-  <div class="card"><div class="v">{eta}</div><div class="l">ETA at last-24h rate ({s['remaining']:,} left)</div></div>
+  <div class="card"><div class="v">{eta}</div><div class="l">ETA, adjusted for pair size ({s['remaining']:,} pairs left)</div></div>
+  <div class="card"><div class="v">{eta_lin}</div><div class="l">ETA, linear (pairs left / last-24h pairs)</div></div>
 </div>
 
 <h2>Beta (GB200) jobs</h2>
@@ -413,6 +491,7 @@ def render_index(stats, q, qb, beta_age):
 
 <h2>Progress</h2>
 <div class="plots wide"><img src="daily_progress.png" alt="Daily progress"></div>
+<div class="plots wide"><img src="hourly_rate.png" alt="Hourly throughput"></div>
 <div class="plots wide"><img src="concurrency.png" alt="Concurrency timeline"></div>
 
 <h2>Distributions</h2>
@@ -439,6 +518,7 @@ def main():
     done = _scan_done_pairs()
     stats = topline(df, q, qb, done)
     plot_daily_progress(done)
+    plot_hourly_rate(done)
     plot_concurrency(df)
     plot_pending(df)
     plot_runtime(df)
@@ -450,6 +530,7 @@ def main():
         "last24_rate": stats["last24_rate"],
         "remaining":   stats["remaining"],
         "eta_days":    stats["eta_days"] if stats["eta_days"] != float("inf") else None,
+        "eta_linear":  stats["eta_linear"] if stats["eta_linear"] != float("inf") else None,
         "running":     stats["running"],
         "pending":     stats["pending"],
         "beta_running": stats["beta_running"],

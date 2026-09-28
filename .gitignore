@@ -3,3 +3,4 @@ __pycache__/
 beta_snapshot.json
 beta_snapshot.json.tmp
 beta_snapshot.log
+pair_sizes.json
