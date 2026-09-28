@@ -1,14 +1,14 @@
 {
-  "now": "2026-09-28 02:07 EDT",
-  "total_done": 18603,
-  "today_done": 1500,
-  "last24_rate": 12241,
-  "remaining": 17147,
-  "eta_days": 1.4007842496528062,
+  "now": "2026-09-28 03:08 EDT",
+  "total_done": 19176,
+  "today_done": 2073,
+  "last24_rate": 12598,
+  "remaining": 16574,
+  "eta_days": 1.3156056516907446,
   "running": 29,
-  "pending": 66,
+  "pending": 67,
   "beta_running": 29,
   "beta_pending": 10,
-  "beta_done": 14682,
-  "beta_last24": 11220
+  "beta_done": 15204,
+  "beta_last24": 11568
 }
