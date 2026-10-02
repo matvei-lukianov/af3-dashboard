@@ -1,15 +1,15 @@
 {
-  "now": "2026-10-02 10:41 EDT",
-  "total_done": 34724,
-  "today_done": 526,
-  "last24_rate": 1068,
-  "remaining": 1026,
-  "eta_days": 0.999578805595882,
-  "eta_linear": 0.9606741573033708,
-  "running": 21,
+  "now": "2026-10-02 11:43 EDT",
+  "total_done": 34788,
+  "today_done": 590,
+  "last24_rate": 1096,
+  "remaining": 962,
+  "eta_days": 0.8920471669190048,
+  "eta_linear": 0.8777372262773723,
+  "running": 19,
   "pending": 0,
-  "beta_running": 8,
-  "beta_pending": 8,
-  "beta_done": 29446,
-  "beta_last24": 1065
+  "beta_running": 9,
+  "beta_pending": 7,
+  "beta_done": 28578,
+  "beta_last24": 843
 }

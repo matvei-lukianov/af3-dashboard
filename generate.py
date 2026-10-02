@@ -112,6 +112,20 @@ def _scan_done_pairs():
 BETA_SNAPSHOT = OUT / "beta_snapshot.json"
 BETA_CLAIMS   = Path("/mnt/home/mlikianov/af3_logs/beta_claims.txt")
 
+def beta_pairs():
+    """Pairs actually finished by a Beta job (RESULT rc=0 in its per-GPU logs).
+    Attributing by receptor is wrong once a receptor is split between clusters."""
+    import glob as _glob
+    out = set()
+    for f in _glob.glob("/mnt/home/mlikianov/af3_logs/af3_beta_*_gpu*.log"):
+        with open(f, errors="replace") as fh:
+            for l in fh:
+                if " RESULT rc=0 " in l:
+                    m = re.search(r"\] (p\d+-p\d+) RESULT rc=0 ", l)
+                    if m:
+                        out.add(m.group(1))
+    return out
+
 def beta_receptors():
     return set(BETA_CLAIMS.read_text().split()) if BETA_CLAIMS.exists() else set()
 
@@ -173,9 +187,9 @@ def topline(df, q, qb, done):
     today = now.normalize()
 
     done_pairs = {p for p, _ in done}
-    beta_r = beta_receptors()
+    beta_p = beta_pairs()
     beta_ts = pd.Series([pd.Timestamp(datetime.fromtimestamp(t)) for p, t in done
-                         if p.split("-")[0] in beta_r])
+                         if p in beta_p])
     done_ts = pd.Series([pd.Timestamp(datetime.fromtimestamp(t)) for _, t in done])
     today_done = int((done_ts >= today).sum()) if len(done_ts) else 0
     yest_done  = int(((done_ts >= today - timedelta(days=1)) & (done_ts < today)).sum()) if len(done_ts) else 0
@@ -212,8 +226,8 @@ def plot_daily_progress(done):
     stacked Alpha + Beta. Beta = receptors listed in beta_claims.txt."""
     if not done:
         return
-    beta_r = beta_receptors()
-    ts = pd.DataFrame([(pd.Timestamp(datetime.fromtimestamp(t)), p.split("-")[0] in beta_r)
+    beta_p = beta_pairs()
+    ts = pd.DataFrame([(pd.Timestamp(datetime.fromtimestamp(t)), p in beta_p)
                        for p, t in done], columns=["t", "beta"]).sort_values("t")
     t0 = max(ts["t"].iloc[0].floor("h"), pd.Timestamp(CAMPAIGN_START))
     t1 = pd.Timestamp.now().ceil("h")
@@ -256,11 +270,11 @@ def plot_hourly_rate(done, hours=72):
     every 10 min over the last `hours`, stacked Alpha + Beta."""
     if not done:
         return
-    beta_r = beta_receptors()
+    beta_p = beta_pairs()
     now = pd.Timestamp.now()
     t0 = (now - pd.Timedelta(hours=hours)).floor("10min")
     samples = pd.date_range(t0, now.floor("10min"), freq="10min")
-    ts = pd.DataFrame([(pd.Timestamp(datetime.fromtimestamp(t)), p.split("-")[0] in beta_r)
+    ts = pd.DataFrame([(pd.Timestamp(datetime.fromtimestamp(t)), p in beta_p)
                        for p, t in done], columns=["t", "beta"])
     def roll(sub):
         v = np.sort(sub["t"].values)
