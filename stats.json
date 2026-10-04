@@ -1,8 +1,8 @@
 {
-  "now": "2026-10-04 16:24 EDT",
+  "now": "2026-10-04 17:27 EDT",
   "total_done": 35750,
   "today_done": 0,
-  "last24_rate": 60,
+  "last24_rate": 53,
   "remaining": 0,
   "eta_days": null,
   "eta_linear": 0.0,
@@ -11,5 +11,5 @@
   "beta_running": 0,
   "beta_pending": 0,
   "beta_done": 29273,
-  "beta_last24": 60
+  "beta_last24": 53
 }
