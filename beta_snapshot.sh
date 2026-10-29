@@ -36,8 +36,25 @@ for ln in sh(["sacct", "-u", "mlikianov", "-X", "--starttime=2026-09-21",
     p = ln.split("|")
     if len(p) == 8 and p[1].startswith("af3_beta_"):
         hist.append(dict(zip(["JobID","JobName","Submit","Start","End","Elapsed","State","NodeList"], p)))
+# Kamila's rerun list (AF3_kamila_launcher.py): own job names, pairs files and log dir.
+KLOG = f"{LOG}/kamila_rerun"
+kq = []
+for ln in sh(["squeue", "-u", "mlikianov", "-h", "-o", "%i|%j|%T|%M|%L|%R|%V"]).splitlines():
+    p = ln.split("|")
+    if len(p) >= 7 and p[1].startswith("af3_kam_"):
+        jid, name = p[0], p[1]
+        pf = f"{KLOG}/jobs/{jid}.pairs"
+        total = len(open(pf).read().split()) if os.path.exists(pf) else None
+        done = fail = 0
+        for f in glob.glob(f"{KLOG}/{name}_{jid}_gpu*.log"):
+            for l in open(f, errors="replace"):
+                if " RESULT rc=" in l:
+                    if " RESULT rc=0 " in l: done += 1
+                    else: fail += 1
+        kq.append(dict(JobID=jid, Name=name, State=p[2], Elapsed=p[3], TimeLeft=p[4],
+                       Reason=p[5], Submit=p[6], pairs_total=total, pairs_done=done, pairs_failed=fail))
 tmp = out + ".tmp"
-json.dump(dict(ts=time.time(), queue=q, sacct=hist), open(tmp, "w"))
+json.dump(dict(ts=time.time(), queue=q, sacct=hist, kamila=kq), open(tmp, "w"))
 os.replace(tmp, out)
 EOF
     sleep "$INTERVAL"

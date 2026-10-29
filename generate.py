@@ -140,6 +140,26 @@ def load_beta():
     return pd.DataFrame(d["queue"], columns=cols), age
 
 
+# ----- Kamila's rerun list (Oct 2026, AF3_kamila_launcher.py, Beta only) ---
+
+KAMILA_ROOT  = Path("/mnt/home/mlikianov/kamila_rerun")
+KAMILA_PAIRS = Path("/mnt/home/mlikianov/new_task/kamila_v2/pairs_new.txt")
+KAMILA_JOBS  = Path("/mnt/home/mlikianov/af3_logs/kamila_rerun/jobs")
+
+def load_kamila():
+    """Returns dict: total, submitted, done, queue rows (from the Beta snapshot)."""
+    pairs = KAMILA_PAIRS.read_text().split() if KAMILA_PAIRS.exists() else []
+    done = sum(1 for c in pairs if any(
+        (KAMILA_ROOT / f"{c.split('-')[0]}-vs-all" / f"{c}_af3_output").glob(f"*/{c}_af3_model.cif")))
+    submitted = set()
+    for f in KAMILA_JOBS.glob("*.pairs") if KAMILA_JOBS.is_dir() else []:
+        submitted |= set(f.read_text().split())
+    rows = []
+    if BETA_SNAPSHOT.exists():
+        rows = json.loads(BETA_SNAPSHOT.read_text()).get("kamila", [])
+    return dict(total=len(pairs), submitted=len(submitted), done=done, queue=rows)
+
+
 # ----- size-aware ETA ------------------------------------------------------
 # Remaining pairs differ a lot in size (250 .. 3400 residues, ~30x in compute), so
 # "pairs left / pairs per day" swings with whatever mix just finished. Instead weigh
@@ -416,8 +436,22 @@ tr:nth-child(even) { background: #fafafa; }
                border-radius: 4px; }
 """
 
-def render_index(stats, q, qb, beta_age):
+def render_index(stats, q, qb, beta_age, kam):
     s = stats
+    def kam_rows():
+        rows = []
+        for r in sorted(kam["queue"], key=lambda r: r["Name"]):
+            tot = r.get("pairs_total")
+            prog = f"{r['pairs_done']} / {tot}" if tot is not None else str(r["pairs_done"])
+            if r.get("pairs_failed"):
+                prog += f" ({r['pairs_failed']} failed)"
+            where = r["Reason"] if r["State"] == "RUNNING" else f"pending: {r['Reason']}"
+            rows.append(f"<tr><td>{html.escape(r['Name'])}</td><td>{html.escape(r['State'])}</td>"
+                        f"<td>{html.escape(r['Elapsed'])}</td><td>{html.escape(r['TimeLeft'])}</td>"
+                        f"<td>{html.escape(prog)}</td><td>{html.escape(where)}</td></tr>")
+        return "".join(rows) or "<tr><td colspan=6><em>none</em></td></tr>"
+    k_run = sum(r["State"] == "RUNNING" for r in kam["queue"])
+    k_pd  = sum(r["State"] == "PENDING" for r in kam["queue"])
     def beta_rows():
         rows = []
         for _, r in qb.iterrows():
@@ -478,6 +512,18 @@ def render_index(stats, q, qb, beta_age):
   <div class="card"><div class="v">{eta_lin}</div><div class="l">ETA, linear (pairs left / last-24h pairs)</div></div>
 </div>
 
+<h2>Kamila rerun (Beta, QOS standard)</h2>
+<p class='stamp'>Her unfinished_pairs list, generated with her script into <code>kamila_rerun/</code>; pure AF3, no scoring. Submitted = sent to Beta within the current SU budget.</p>
+<div class="cards">
+  <div class="card"><div class="v">{kam['done']:,} / {kam['total']:,}</div><div class="l">Pairs done / in list</div></div>
+  <div class="card"><div class="v">{kam['done']:,} / {kam['submitted']:,}</div><div class="l">Pairs done / submitted</div></div>
+  <div class="card"><div class="v">{k_run} / {k_pd}</div><div class="l">Jobs running / pending (4× GB200 each)</div></div>
+</div>
+<div class="queue-table">
+<table><thead><tr><th>Job</th><th>State</th><th>Elapsed</th><th>Left</th><th>Pairs done</th><th>Node / reason</th></tr></thead>
+<tbody>{kam_rows()}</tbody></table>
+</div>
+
 <h2>Beta (GB200) jobs</h2>
 {beta_note}
 <div class="queue-table">
@@ -536,7 +582,8 @@ def main():
     plot_concurrency(df)
     plot_pending(df)
     plot_runtime(df)
-    (OUT/"index.html").write_text(render_index(stats, q, qb, beta_age))
+    kam = load_kamila()
+    (OUT/"index.html").write_text(render_index(stats, q, qb, beta_age, kam))
     (OUT/"stats.json").write_text(json.dumps({
         "now":         stats["now"],
         "total_done":  stats["total_done"],
